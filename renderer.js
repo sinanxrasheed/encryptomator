@@ -12,8 +12,12 @@ const revealDisk = document.getElementById('revealDisk');
 const revealPasswordInput = document.getElementById('revealPassword');
 const unlockVaultBtn = document.getElementById('unlockVaultBtn');
 const revealError = document.getElementById('revealError');
+const lockDiskBtn = document.getElementById('lockDiskBtn');
+const unlockVaultBrowseBtn = document.getElementById('unlockVaultBrowseBtn');
 
 let vaultLocation = '';
+let revealedTempDir = '';
+let tempDir = '';
 
 createVaultBtn.onclick = async () => {
   vaultLocation = await ipcRenderer.invoke('select-vault-location');
@@ -47,20 +51,43 @@ revealDiskBtn.onclick = () => {
   revealDisk.classList.remove('hidden');
 };
 
+const customNameInput = document.createElement('input');
+customNameInput.type = 'text';
+customNameInput.id = 'customNameInput';
+customNameInput.placeholder = 'Name for decrypted vault (Location B)';
+document.getElementById('revealDisk').insertBefore(customNameInput, unlockVaultBtn);
+
 unlockVaultBtn.onclick = async () => {
   const password = revealPasswordInput.value;
+  const customName = customNameInput.value.trim();
   if (!password) {
     revealError.textContent = 'Enter your vault password!';
     return;
   }
-  const result = await ipcRenderer.invoke('reveal-disk', { vaultPath: vaultLocation, password });
+  const result = await ipcRenderer.invoke('reveal-disk', { vaultPath: vaultLocation, password, customName });
   if (result.success) {
     revealError.textContent = '';
+    tempDir = result.tempDir; // Save the tempDir for locking
+    document.getElementById('lockDiskBtn').classList.remove('hidden');
     alert('Decrypted vault revealed in Explorer!');
-    // Optionally, hide the password prompt after success
     revealDisk.classList.add('hidden');
   } else {
     revealError.textContent = result.error || 'Unlock failed.';
+  }
+};
+
+lockDiskBtn.onclick = async () => {
+  if (!tempDir) {
+    alert('No decrypted disk to lock.');
+    return;
+  }
+  const result = await ipcRenderer.invoke('lock-disk', { tempDir });
+  if (result.success) {
+    alert('Decrypted vault locked and cleaned up!');
+    document.getElementById('lockDiskBtn').classList.add('hidden');
+    tempDir = '';
+  } else {
+    alert(result.error || 'Failed to lock disk.');
   }
 };
 
@@ -113,6 +140,20 @@ decryptPasswordInput.onchange = async () => {
     } else {
       decryptResult.textContent = result.error || 'Decryption failed.';
     }
+  }
+};
+
+unlockVaultBrowseBtn.onclick = async () => {
+  // Let user select a vault folder
+  const selectedVault = await ipcRenderer.invoke('select-vault-location');
+  if (selectedVault) {
+    vaultLocation = selectedVault;
+    vaultLocationSpan.textContent = vaultLocation;
+    // Show the unlock UI for this vault
+    revealDiskBtn.classList.remove('hidden');
+    revealDisk.classList.remove('hidden');
+    // Optionally, hide other sections
+    vaultSetup.classList.add('hidden');
   }
 };
 

@@ -120,7 +120,7 @@ ipcMain.handle('decrypt-file', async (event, { vaultPath, encFilePath, password,
 });
 
 // Helper: Reveal Disk - decrypt all files to a temp location and open in Explorer
-ipcMain.handle('reveal-disk', async (event, { vaultPath, password }) => {
+ipcMain.handle('reveal-disk', async (event, { vaultPath, password, customName }) => {
   try {
     const metaPath = path.join(vaultPath, '.encryptomator.meta.json');
     if (!fs.existsSync(metaPath)) return { success: false, error: 'Vault metadata missing.' };
@@ -129,25 +129,54 @@ ipcMain.handle('reveal-disk', async (event, { vaultPath, password }) => {
     const key = deriveKey(password, salt);
     const encDir = path.join(vaultPath, 'data');
     if (!fs.existsSync(encDir)) return { success: false, error: 'Encrypted data folder missing.' };
-    // Create a temp directory for decrypted files
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'encryptomator-'));
+    // Create a temp directory for decrypted files, with custom name if provided
+    let tempDir;
+    if (customName) {
+      tempDir = path.join(os.tmpdir(), customName);
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+    } else {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'encryptomator-'));
+    }
     // Decrypt all .enc files
     const files = fs.readdirSync(encDir).filter(f => f.endsWith('.enc'));
-    for (const file of files) {
-      const encFilePath = path.join(encDir, file);
-      const enc = fs.readFileSync(encFilePath);
-      const iv = enc.slice(0, 12);
-      const tag = enc.slice(12, 28);
-      const encrypted = enc.slice(28);
-      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-      decipher.setAuthTag(tag);
-      const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-      const outPath = path.join(tempDir, path.basename(file, '.enc'));
-      fs.writeFileSync(outPath, decrypted);
+    if (files.length === 0) {
+      // Create a README file to indicate the vault is empty
+      fs.writeFileSync(path.join(tempDir, 'README.txt'), 'This vault is empty. Add files to your encrypted vault to see them here.');
+    } else {
+      for (const file of files) {
+        const encFilePath = path.join(encDir, file);
+        const enc = fs.readFileSync(encFilePath);
+        if (enc.length < 28) continue; // Not a valid encrypted file
+        const iv = enc.slice(0, 12);
+        const tag = enc.slice(12, 28);
+        const encrypted = enc.slice(28);
+        try {
+          const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+          decipher.setAuthTag(tag);
+          const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+          const outPath = path.join(tempDir, path.basename(file, '.enc'));
+          fs.writeFileSync(outPath, decrypted);
+        } catch (err) {
+          // If decryption fails, skip the file and optionally log error
+        }
+      }
     }
     // Open the temp directory in Explorer
     shell.openPath(tempDir);
     return { success: true, tempDir };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// Helper: Lock Disk - delete the temporary decrypted directory
+ipcMain.handle('lock-disk', async (event, { tempDir }) => {
+  try {
+    if (tempDir && fs.existsSync(tempDir)) {
+      // Recursively delete the temp directory and its contents
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+    return { success: true };
   } catch (e) {
     return { success: false, error: e.message };
   }
