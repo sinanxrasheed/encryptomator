@@ -53,14 +53,12 @@ unlockVaultBtn.onclick = async () => {
     revealError.textContent = 'Enter your vault password!';
     return;
   }
-  window.electronAPI = window.electronAPI || require('electron');
-  const { ipcRenderer } = window.electronAPI;
-  const result = await ipcRenderer.invoke('unlock-vault', { vaultPath: vaultLocation, password });
+  const result = await ipcRenderer.invoke('reveal-disk', { vaultPath: vaultLocation, password });
   if (result.success) {
     revealError.textContent = '';
-    document.getElementById('fileOps').classList.remove('hidden');
-    // Optionally hide revealDisk UI
-    // revealDisk.classList.add('hidden');
+    alert('Decrypted vault revealed in Explorer!');
+    // Optionally, hide the password prompt after success
+    revealDisk.classList.add('hidden');
   } else {
     revealError.textContent = result.error || 'Unlock failed.';
   }

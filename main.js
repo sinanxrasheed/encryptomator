@@ -1,8 +1,9 @@
 // Main process for Electron
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const os = require('os');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -113,6 +114,40 @@ ipcMain.handle('decrypt-file', async (event, { vaultPath, encFilePath, password,
     const outPath = path.join(outDir, path.basename(encFilePath, '.enc'));
     fs.writeFileSync(outPath, decrypted);
     return { success: true, outPath };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// Helper: Reveal Disk - decrypt all files to a temp location and open in Explorer
+ipcMain.handle('reveal-disk', async (event, { vaultPath, password }) => {
+  try {
+    const metaPath = path.join(vaultPath, '.encryptomator.meta.json');
+    if (!fs.existsSync(metaPath)) return { success: false, error: 'Vault metadata missing.' };
+    const meta = JSON.parse(fs.readFileSync(metaPath));
+    const salt = Buffer.from(meta.salt, 'hex');
+    const key = deriveKey(password, salt);
+    const encDir = path.join(vaultPath, 'data');
+    if (!fs.existsSync(encDir)) return { success: false, error: 'Encrypted data folder missing.' };
+    // Create a temp directory for decrypted files
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'encryptomator-'));
+    // Decrypt all .enc files
+    const files = fs.readdirSync(encDir).filter(f => f.endsWith('.enc'));
+    for (const file of files) {
+      const encFilePath = path.join(encDir, file);
+      const enc = fs.readFileSync(encFilePath);
+      const iv = enc.slice(0, 12);
+      const tag = enc.slice(12, 28);
+      const encrypted = enc.slice(28);
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAuthTag(tag);
+      const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+      const outPath = path.join(tempDir, path.basename(file, '.enc'));
+      fs.writeFileSync(outPath, decrypted);
+    }
+    // Open the temp directory in Explorer
+    shell.openPath(tempDir);
+    return { success: true, tempDir };
   } catch (e) {
     return { success: false, error: e.message };
   }
