@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Encryptomator</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    button { margin: 10px 0; padding: 10px 20px; font-size: 16px; }
+    input[type="password"], input[type="text"] { padding: 8px; margin: 5px 0; width: 100%; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Encryptomator</h1>
+  <button id="createVaultBtn">Create Vault</button>
+  <div id="vaultSetup" class="hidden">
+    <p>Vault Location: <span id="vaultLocation"></span></p>
+    <input type="password" id="password" placeholder="Enter password" />
+    <input type="password" id="confirmPassword" placeholder="Confirm password" />
+    <button id="finalizeVaultBtn">Finalize Vault</button>
+    <div id="vaultError" style="color:red;"></div>
+  </div>
+  <button id="revealDiskBtn" class="hidden">Reveal Disk</button>
+  <div id="revealDisk" class="hidden">
+    <input type="password" id="revealPassword" placeholder="Enter vault password" />
+    <button id="unlockVaultBtn">Unlock Vault</button>
+    <div id="revealError" style="color:red;"></div>
+  </div>
+  <div id="fileOps" class="hidden">
+    <h3>File Operations</h3>
+    <button id="selectFileToEncryptBtn">Select File to Encrypt</button>
+    <input type="password" id="encryptPassword" placeholder="Vault password for encryption" />
+    <div id="encryptResult" style="color:green;"></div>
+    <button id="selectFileToDecryptBtn">Select File to Decrypt</button>
+    <button id="selectDecryptOutputDirBtn">Select Output Directory</button>
+    <input type="password" id="decryptPassword" placeholder="Vault password for decryption" />
+    <div id="decryptResult" style="color:green;"></div>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>
