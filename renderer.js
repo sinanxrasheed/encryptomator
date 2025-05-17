@@ -67,9 +67,14 @@ unlockVaultBtn.onclick = async () => {
   const result = await ipcRenderer.invoke('reveal-disk', { vaultPath: vaultLocation, password, customName });
   if (result.success) {
     revealError.textContent = '';
-    tempDir = result.tempDir; // Save the tempDir for locking
+    tempDir = result.tempDir;
     document.getElementById('lockDiskBtn').classList.remove('hidden');
-    alert('Decrypted vault revealed in Explorer!');
+    // Show decrypted files in an alert for debugging
+    if (result.decryptedFiles && result.decryptedFiles.length > 0) {
+      alert('Decrypted files: ' + result.decryptedFiles.join(', '));
+    } else {
+      alert('No files decrypted. The vault may be empty or files are missing.');
+    }
     revealDisk.classList.add('hidden');
   } else {
     revealError.textContent = result.error || 'Unlock failed.';
@@ -81,7 +86,13 @@ lockDiskBtn.onclick = async () => {
     alert('No decrypted disk to lock.');
     return;
   }
-  const result = await ipcRenderer.invoke('lock-disk', { tempDir });
+  // Use the password from the last unlock
+  const password = revealPasswordInput.value;
+  if (!vaultLocation || !password) {
+    alert('Vault location or password missing.');
+    return;
+  }
+  const result = await ipcRenderer.invoke('lock-disk', { tempDir, vaultPath: vaultLocation, password });
   if (result.success) {
     alert('Decrypted vault locked and cleaned up!');
     document.getElementById('lockDiskBtn').classList.add('hidden');
@@ -95,51 +106,103 @@ lockDiskBtn.onclick = async () => {
 const selectFileToEncryptBtn = document.getElementById('selectFileToEncryptBtn');
 const encryptPasswordInput = document.getElementById('encryptPassword');
 const encryptResult = document.getElementById('encryptResult');
+const encryptFileBtn = document.getElementById('encryptFileBtn');
 const selectFileToDecryptBtn = document.getElementById('selectFileToDecryptBtn');
 const selectDecryptOutputDirBtn = document.getElementById('selectDecryptOutputDirBtn');
 const decryptPasswordInput = document.getElementById('decryptPassword');
 const decryptResult = document.getElementById('decryptResult');
+const decryptFileBtn = document.getElementById('decryptFileBtn');
 
 let fileToEncrypt = '';
 let fileToDecrypt = '';
 let decryptOutputDir = '';
 
 selectFileToEncryptBtn.onclick = async () => {
-  const file = await ipcRenderer.invoke('select-vault-location'); // reuse dialog for file selection
-  if (file) fileToEncrypt = file;
-};
-
-selectFileToDecryptBtn.onclick = async () => {
-  const file = await ipcRenderer.invoke('select-vault-location'); // reuse dialog for file selection
-  if (file) fileToDecrypt = file;
-};
-
-selectDecryptOutputDirBtn.onclick = async () => {
-  const dir = await ipcRenderer.invoke('select-vault-location'); // reuse dialog for dir selection
-  if (dir) decryptOutputDir = dir;
-};
-
-// Encrypt file
-encryptPasswordInput.onchange = async () => {
-  if (fileToEncrypt && encryptPasswordInput.value) {
-    const result = await ipcRenderer.invoke('encrypt-file', { vaultPath: vaultLocation, filePath: fileToEncrypt, password: encryptPasswordInput.value });
-    if (result.success) {
-      encryptResult.textContent = 'File encrypted successfully!';
-    } else {
-      encryptResult.textContent = result.error || 'Encryption failed.';
-    }
+  const file = await ipcRenderer.invoke('select-file');
+  if (file) {
+    fileToEncrypt = file;
+    encryptResult.textContent = `Selected file: ${file}`;
   }
 };
 
-// Decrypt file
-decryptPasswordInput.onchange = async () => {
-  if (fileToDecrypt && decryptOutputDir && decryptPasswordInput.value) {
-    const result = await ipcRenderer.invoke('decrypt-file', { vaultPath: vaultLocation, encFilePath: fileToDecrypt, password: decryptPasswordInput.value, outDir: decryptOutputDir });
-    if (result.success) {
-      decryptResult.textContent = 'File decrypted successfully!';
-    } else {
-      decryptResult.textContent = result.error || 'Decryption failed.';
-    }
+selectFileToDecryptBtn.onclick = async () => {
+  const file = await ipcRenderer.invoke('select-file');
+  if (file) {
+    fileToDecrypt = file;
+    decryptResult.textContent = `Selected file: ${file}`;
+  }
+};
+
+selectDecryptOutputDirBtn.onclick = async () => {
+  const dir = await ipcRenderer.invoke('select-vault-location');
+  if (dir) {
+    decryptOutputDir = dir;
+    decryptResult.textContent = `Selected output directory: ${dir}`;
+  }
+};
+
+
+// Encrypt file button click handler
+encryptFileBtn.onclick = async () => {
+  if (!fileToEncrypt) {
+    encryptResult.textContent = 'Please select a file to encrypt first.';
+    return;
+  }
+  if (!encryptPasswordInput.value) {
+    encryptResult.textContent = 'Please enter the vault password.';
+    return;
+  }
+  if (!vaultLocation) {
+    encryptResult.textContent = 'Please select or create a vault first.';
+    return;
+  }
+  
+  const result = await ipcRenderer.invoke('encrypt-file', {
+    vaultPath: vaultLocation,
+    filePath: fileToEncrypt,
+    password: encryptPasswordInput.value
+  });
+  
+  if (result.success) {
+    encryptResult.textContent = `File encrypted successfully! Stored at: ${result.outPath}`;
+    // Clear the file path and password for security
+    fileToEncrypt = '';
+    encryptPasswordInput.value = '';
+  } else {
+    encryptResult.textContent = result.error || 'Encryption failed.';
+  }
+};
+
+// Decrypt file button click handler
+decryptFileBtn.onclick = async () => {
+  if (!fileToDecrypt) {
+    decryptResult.textContent = 'Please select a file to decrypt first.';
+    return;
+  }
+  if (!decryptOutputDir) {
+    decryptResult.textContent = 'Please select an output directory.';
+    return;
+  }
+  if (!decryptPasswordInput.value) {
+    decryptResult.textContent = 'Please enter the vault password.';
+    return;
+  }
+  
+  const result = await ipcRenderer.invoke('decrypt-file', {
+    vaultPath: vaultLocation,
+    encFilePath: fileToDecrypt,
+    password: decryptPasswordInput.value,
+    outDir: decryptOutputDir
+  });
+  
+  if (result.success) {
+    decryptResult.textContent = `File decrypted successfully! Saved to: ${result.outPath}`;
+    // Clear the file path and password for security
+    fileToDecrypt = '';
+    decryptPasswordInput.value = '';
+    decryptOutputDir = '';
+  } else {
+    decryptResult.textContent = result.error || 'Decryption failed.';
   }
 };
 
