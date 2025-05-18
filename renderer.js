@@ -66,6 +66,9 @@ unlockVaultBtn.onclick = async () => {
   }
   const result = await ipcRenderer.invoke('reveal-disk', { vaultPath: vaultLocation, password, customName });
   if (result.success) {
+    if (result.migrated) {
+      alert('Vault has been upgraded to Argon2id for stronger security!');
+    }
     revealError.textContent = '';
     tempDir = result.tempDir;
     document.getElementById('lockDiskBtn').classList.remove('hidden');
