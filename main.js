@@ -139,12 +139,13 @@ ipcMain.handle('reveal-disk', async (event, { vaultPath, password, customName })
     const key = deriveKey(password, salt);
     const encDir = path.join(vaultPath, 'data');
     if (!fs.existsSync(encDir)) return { success: false, error: 'Encrypted data folder missing.' };
-    // Use a subfolder in the vault directory for decrypted files
+    // Use a subfolder in the parent directory of the vault for decrypted files
     let tempDir;
+    const parentDir = path.dirname(vaultPath);
     if (customName) {
-      tempDir = path.join(vaultPath, customName);
+      tempDir = path.join(parentDir, customName);
     } else {
-      tempDir = path.join(vaultPath, 'unlocked');
+      tempDir = path.join(parentDir, 'unlocked');
     }
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
