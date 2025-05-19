@@ -55,6 +55,37 @@ async function verifyArgon2(hash, password) {
   return await argon2.verify(hash, password);
 }
 
+// Helper: Encrypt sensitive metadata fields
+function encryptMetaSensitiveFields(meta, password) {
+  const crypto = require('crypto');
+  const sensitive = {
+    salt: meta.salt,
+    hash: meta.hash
+  };
+  const iv = crypto.randomBytes(12);
+  // Derive a key from the password (using PBKDF2 for meta encryption, separate from vault key)
+  const key = crypto.pbkdf2Sync(password, Buffer.from(meta.salt, 'hex'), 100000, 32, 'sha256');
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const enc = Buffer.concat([cipher.update(JSON.stringify(sensitive), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return {
+    encrypted: Buffer.concat([iv, tag, enc]).toString('base64')
+  };
+}
+
+function decryptMetaSensitiveFields(encrypted, password, saltHex) {
+  const crypto = require('crypto');
+  const buf = Buffer.from(encrypted, 'base64');
+  const iv = buf.slice(0, 12);
+  const tag = buf.slice(12, 28);
+  const enc = buf.slice(28);
+  const key = crypto.pbkdf2Sync(password, Buffer.from(saltHex, 'hex'), 100000, 32, 'sha256');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
+  return JSON.parse(dec.toString('utf8'));
+}
+
 // Helper: Create vault structure and store password hash (Argon2id)
 ipcMain.handle('finalize-vault', async (event, { vaultPath, password }) => {
   try {
@@ -69,9 +100,10 @@ ipcMain.handle('finalize-vault', async (event, { vaultPath, password }) => {
       parallelism: 2,
       hashLength: 32
     });
+    // Encrypt sensitive fields
+    const encrypted = encryptMetaSensitiveFields({ salt: salt.toString('hex'), hash }, password);
     const meta = {
-      salt: salt.toString('hex'),
-      hash,
+      encrypted: encrypted.encrypted,
       created: new Date().toISOString(),
       kdf: 'argon2id'
     };
@@ -87,10 +119,13 @@ ipcMain.handle('finalize-vault', async (event, { vaultPath, password }) => {
 ipcMain.handle('unlock-vault', async (event, { vaultPath, password }) => {
   try {
     const metaPath = path.join(vaultPath, '.encryptomator.meta.json');
-    if (!fs.existsSync(metaPath)) return { success: false, error: 'Vault metadata missing.' };
+    if (!fs.existsSync(metaPath))
+      return { success: false, error: 'Vault metadata not found.' };
     const meta = JSON.parse(fs.readFileSync(metaPath));
     if (meta.kdf === 'argon2id') {
-      const valid = await verifyArgon2(meta.hash, password);
+      // Decrypt sensitive fields
+      const sensitive = decryptMetaSensitiveFields(meta.encrypted, password, undefined);
+      const valid = await argon2.verify(sensitive.hash, password);
       if (!valid) return { success: false, error: 'Invalid password.' };
       return { success: true };
     } else {
@@ -127,7 +162,9 @@ ipcMain.handle('unlock-vault', async (event, { vaultPath, password }) => {
 // Helper: Derive symmetric key for encryption (Argon2id or PBKDF2)
 async function getSymmetricKey(password, meta) {
   if (meta.kdf === 'argon2id') {
-    const salt = Buffer.from(meta.salt, 'hex');
+    // Decrypt sensitive fields
+    const sensitive = decryptMetaSensitiveFields(meta.encrypted, password, undefined);
+    const salt = Buffer.from(sensitive.salt, 'hex');
     return await deriveKeyArgon2(password, salt);
   } else {
     const salt = Buffer.from(meta.salt, 'hex');

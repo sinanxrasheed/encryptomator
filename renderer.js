@@ -18,6 +18,7 @@ const unlockVaultBrowseBtn = document.getElementById('unlockVaultBrowseBtn');
 let vaultLocation = '';
 let revealedTempDir = '';
 let tempDir = '';
+let lastUnlockPassword = '';
 
 createVaultBtn.onclick = async () => {
   vaultLocation = await ipcRenderer.invoke('select-vault-location');
@@ -27,23 +28,41 @@ createVaultBtn.onclick = async () => {
   }
 };
 
+// Securely clear password variables from memory after use
+function clearString(str) {
+  if (typeof str === 'string') {
+    for (let i = 0; i < str.length; i++) {
+      str = str.replace(str[i], '\u0000');
+    }
+  }
+  return '';
+}
+
 finalizeVaultBtn.onclick = async () => {
-  const password = passwordInput.value;
-  const confirmPassword = confirmPasswordInput.value;
+  let password = passwordInput.value;
+  let confirmPassword = confirmPasswordInput.value;
   if (!password || password !== confirmPassword) {
     vaultError.textContent = 'Passwords do not match!';
+    passwordInput.value = '';
+    confirmPasswordInput.value = '';
+    password = clearString(password);
+    confirmPassword = clearString(confirmPassword);
     return;
   }
   // Call main process to create vault and store password hash
   window.electronAPI = window.electronAPI || require('electron');
   const { ipcRenderer } = window.electronAPI;
   const result = await ipcRenderer.invoke('finalize-vault', { vaultPath: vaultLocation, password });
+  passwordInput.value = '';
+  confirmPasswordInput.value = '';
+  password = clearString(password);
+  confirmPassword = clearString(confirmPassword);
   if (result.success) {
     vaultError.textContent = '';
     vaultSetup.classList.add('hidden');
     revealDiskBtn.classList.remove('hidden');
   } else {
-    vaultError.textContent = result.error || 'Vault creation failed.';
+    vaultError.textContent = 'Vault creation failed.';
   }
 };
 
@@ -58,29 +77,36 @@ customNameInput.placeholder = 'Name for decrypted vault (Location B)';
 document.getElementById('revealDisk').insertBefore(customNameInput, unlockVaultBtn);
 
 unlockVaultBtn.onclick = async () => {
-  const password = revealPasswordInput.value;
+  let password = revealPasswordInput.value;
   const customName = customNameInput.value.trim();
   if (!password) {
     revealError.textContent = 'Enter your vault password!';
+    revealPasswordInput.value = '';
+    password = clearString(password);
     return;
   }
   const result = await ipcRenderer.invoke('reveal-disk', { vaultPath: vaultLocation, password, customName });
+  revealPasswordInput.value = '';
   if (result.success) {
+    lastUnlockPassword = password; // Store password for lock
+    password = clearString(password);
     if (result.migrated) {
       alert('Vault has been upgraded to Argon2id for stronger security!');
     }
     revealError.textContent = '';
     tempDir = result.tempDir;
     document.getElementById('lockDiskBtn').classList.remove('hidden');
-    // Show decrypted files in an alert for debugging
-    if (result.decryptedFiles && result.decryptedFiles.length > 0) {
-      alert('Decrypted files: ' + result.decryptedFiles.join(', '));
-    } else {
-      alert('No files decrypted. The vault may be empty or files are missing.');
-    }
+    // Show decrypted files in an alert for debugging (commented out for security)
+    // if (result.decryptedFiles && result.decryptedFiles.length > 0) {
+    //   alert('Decrypted files: ' + result.decryptedFiles.map(f => f.replace(/[^a-zA-Z0-9_.-]/g, '')).join(', '));
+    // } else {
+    //   alert('No files decrypted. The vault may be empty or files are missing.');
+    // }
     revealDisk.classList.add('hidden');
   } else {
-    revealError.textContent = result.error || 'Unlock failed.';
+    password = clearString(password);
+    // Only show generic error
+    revealError.textContent = 'Unlock failed.';
   }
 };
 
@@ -90,18 +116,21 @@ lockDiskBtn.onclick = async () => {
     return;
   }
   // Use the password from the last unlock
-  const password = revealPasswordInput.value;
+  let password = lastUnlockPassword;
   if (!vaultLocation || !password) {
     alert('Vault location or password missing.');
+    password = clearString(password);
     return;
   }
   const result = await ipcRenderer.invoke('lock-disk', { tempDir, vaultPath: vaultLocation, password });
+  password = clearString(password);
+  lastUnlockPassword = '';
   if (result.success) {
     alert('Decrypted vault locked and cleaned up!');
     document.getElementById('lockDiskBtn').classList.add('hidden');
     tempDir = '';
   } else {
-    alert(result.error || 'Failed to lock disk.');
+    alert('Failed to lock disk.');
   }
 };
 
@@ -159,20 +188,19 @@ encryptFileBtn.onclick = async () => {
     encryptResult.textContent = 'Please select or create a vault first.';
     return;
   }
-  
+  let password = encryptPasswordInput.value;
   const result = await ipcRenderer.invoke('encrypt-file', {
     vaultPath: vaultLocation,
     filePath: fileToEncrypt,
-    password: encryptPasswordInput.value
+    password
   });
-  
+  encryptPasswordInput.value = '';
+  password = clearString(password);
   if (result.success) {
-    encryptResult.textContent = `File encrypted successfully! Stored at: ${result.outPath}`;
-    // Clear the file path and password for security
+    encryptResult.textContent = `File encrypted successfully! Stored at: ${result.outPath.replace(/[^a-zA-Z0-9_.\\/-]/g, '')}`;
     fileToEncrypt = '';
-    encryptPasswordInput.value = '';
   } else {
-    encryptResult.textContent = result.error || 'Encryption failed.';
+    encryptResult.textContent = 'Encryption failed.';
   }
 };
 
@@ -190,22 +218,21 @@ decryptFileBtn.onclick = async () => {
     decryptResult.textContent = 'Please enter the vault password.';
     return;
   }
-  
+  let password = decryptPasswordInput.value;
   const result = await ipcRenderer.invoke('decrypt-file', {
     vaultPath: vaultLocation,
     encFilePath: fileToDecrypt,
-    password: decryptPasswordInput.value,
+    password,
     outDir: decryptOutputDir
   });
-  
+  decryptPasswordInput.value = '';
+  password = clearString(password);
   if (result.success) {
-    decryptResult.textContent = `File decrypted successfully! Saved to: ${result.outPath}`;
-    // Clear the file path and password for security
+    decryptResult.textContent = `File decrypted successfully! Saved to: ${result.outPath.replace(/[^a-zA-Z0-9_.\\/-]/g, '')}`;
     fileToDecrypt = '';
-    decryptPasswordInput.value = '';
     decryptOutputDir = '';
   } else {
-    decryptResult.textContent = result.error || 'Decryption failed.';
+    decryptResult.textContent = 'Decryption failed.';
   }
 };
 
