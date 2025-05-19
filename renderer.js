@@ -27,7 +27,7 @@ let lastUnlockPassword = '';
 
 // Vault name validation regex: word chars, numbers, hyphen, underscore
 function isValidVaultName(name) {
-  return /^[\w\-]+$/u.test(name) && name.length > 0;
+  return /^[\w\- ]+$/u.test(name) && name.length > 0;
 }
 
 // Securely clear password variables from memory after use
