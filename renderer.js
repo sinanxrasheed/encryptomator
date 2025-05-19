@@ -14,19 +14,21 @@ const unlockVaultBtn = document.getElementById('unlockVaultBtn');
 const revealError = document.getElementById('revealError');
 const lockDiskBtn = document.getElementById('lockDiskBtn');
 const unlockVaultBrowseBtn = document.getElementById('unlockVaultBrowseBtn');
+const vaultNameModal = document.getElementById('vaultNameModal');
+const vaultNameInput = document.getElementById('vaultNameInput');
+const vaultNameValidation = document.getElementById('vaultNameValidation');
+const vaultNameOkBtn = document.getElementById('vaultNameOkBtn');
+const vaultNameCancelBtn = document.getElementById('vaultNameCancelBtn');
 
 let vaultLocation = '';
 let revealedTempDir = '';
 let tempDir = '';
 let lastUnlockPassword = '';
 
-createVaultBtn.onclick = async () => {
-  vaultLocation = await ipcRenderer.invoke('select-vault-location');
-  if (vaultLocation) {
-    vaultLocationSpan.textContent = vaultLocation;
-    vaultSetup.classList.remove('hidden');
-  }
-};
+// Vault name validation regex: word chars, numbers, hyphen, underscore
+function isValidVaultName(name) {
+  return /^[\w\-]+$/u.test(name) && name.length > 0;
+}
 
 // Securely clear password variables from memory after use
 function clearString(str) {
@@ -37,6 +39,55 @@ function clearString(str) {
   }
   return '';
 }
+
+createVaultBtn.onclick = async () => {
+  vaultNameInput.value = '';
+  vaultNameValidation.innerHTML = '';
+  vaultNameOkBtn.disabled = true;
+  vaultNameModal.classList.remove('hidden');
+  vaultNameModal.style.display = 'flex';
+  vaultNameInput.focus();
+  // Ensure validation box is positioned below and right of the textbox
+  vaultNameValidation.style.position = 'absolute';
+  vaultNameValidation.style.right = '0';
+  vaultNameValidation.style.top = '52px'; // just below the input
+  vaultNameValidation.style.fontSize = '14px';
+  vaultNameValidation.style.marginTop = '2px';
+};
+
+vaultNameInput.oninput = function () {
+  const name = vaultNameInput.value.trim();
+  if (name.length === 0) {
+    vaultNameValidation.innerHTML = '';
+    vaultNameOkBtn.disabled = true;
+    return;
+  }
+  if (isValidVaultName(name)) {
+    vaultNameValidation.innerHTML = '<span style="color:#3cba54;font-weight:500;">✔ Valid vault name</span>';
+    vaultNameOkBtn.disabled = false;
+  } else {
+    vaultNameValidation.innerHTML = '<span style="color:#e53935;font-weight:500;">✖ Invalid vault name</span>';
+    vaultNameOkBtn.disabled = true;
+  }
+};
+
+vaultNameCancelBtn.onclick = function () {
+  vaultNameModal.classList.add('hidden');
+  vaultNameModal.style.display = 'none';
+};
+
+vaultNameOkBtn.onclick = async function () {
+  const name = vaultNameInput.value.trim();
+  if (!isValidVaultName(name)) return;
+  vaultNameModal.classList.add('hidden');
+  vaultNameModal.style.display = 'none';
+  // Continue with vault creation flow (show location picker, etc.)
+  vaultLocation = await ipcRenderer.invoke('select-vault-location');
+  if (vaultLocation) {
+    vaultLocationSpan.textContent = vaultLocation + ' (' + name + ')';
+    vaultSetup.classList.remove('hidden');
+  }
+};
 
 finalizeVaultBtn.onclick = async () => {
   let password = passwordInput.value;
