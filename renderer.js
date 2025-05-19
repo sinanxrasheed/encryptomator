@@ -49,10 +49,11 @@ createVaultBtn.onclick = async () => {
   vaultNameInput.focus();
   // Ensure validation box is positioned below and right of the textbox
   vaultNameValidation.style.position = 'absolute';
-  vaultNameValidation.style.right = '0';
-  vaultNameValidation.style.top = '52px'; // just below the input
+  vaultNameValidation.style.right = '45px';
+  vaultNameValidation.style.top = '90px'; // just below the input
   vaultNameValidation.style.fontSize = '14px';
   vaultNameValidation.style.marginTop = '2px';
+  vaultNameValidation.style.marginBottom = '2px';
 };
 
 vaultNameInput.oninput = function () {

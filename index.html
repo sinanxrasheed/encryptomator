@@ -15,24 +15,25 @@
   <button id="createVaultBtn">Create New Vault</button>
   <!-- Vault Name Modal -->
   <div id="vaultNameModal" class="hidden" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);z-index:1000;display:none;align-items:center;justify-content:center;">
-    <div style="background:#fff;padding:50px 100px 50px 100px;border-radius:8px;min-width:350px;box-shadow:0 2px 16px rgba(0,0,0,0.2);position:relative;">
-      <label for="vaultNameInput" style="font-weight:bold;">Choose a name for the vault</label><br>
-      <input type="text" id="vaultNameInput" style="margin-top:8px;width:100%;padding:8px;font-size:16px;" maxlength="32" autocomplete="off" />
-      <div id="vaultNameValidation" style="position:absolute;right:32px;top:62px;font-size:14px;"></div>
-      <div style="margin-top:16px;font-size:13px;color:#444;">
-        <div>The vault name may contain the following characters:</div>
-        <ul style="margin:8px 0 0 18px;padding:0;list-style:none;">
-          <li>✔️ Word characters (e.g, a, ж or ㅊ)</li>
-          <li>✔️ Numbers</li>
-          <li>✔️ Hyphen (-) or underscore (_)</li>
-        </ul>
-      </div>
-      <div style="margin-top:18px;text-align:right;">
-        <button id="vaultNameCancelBtn" style="margin-right:8px;">Cancel</button>
-        <button id="vaultNameOkBtn" disabled>Create</button>
-      </div>
+  <div style="background:#fff;padding:25px 60px 25px 60px;border-radius:8px;min-width:350px;box-shadow:0 2px 16px rgba(0,0,0,0.2);position:relative;">
+    <label for="vaultNameInput" style="font-weight:bold;">Choose a name for the vault</label><br>
+    <input type="text" id="vaultNameInput" style="margin-top:8px;width:100%;padding:8px;font-size:16px;" maxlength="32" autocomplete="off" />
+    <div id="vaultNameValidation" style="position:absolute;right:32px;top:62px;font-size:14px;"></div>
+    <div style="margin-top:16px;font-size:13px;color:#444;">
+      <br>
+      <div>The vault name may contain the following characters:</div>
+      <ul style="margin:8px 0 0 18px;padding:0;list-style:none;">
+        <li>✔️ Word characters (e.g, a, ж or ㅊ)</li>
+        <li>✔️ Numbers</li>
+        <li>✔️ Hyphen (-) or underscore (_)</li>
+      </ul>
+    </div>
+    <div style="margin-top:18px;text-align:right;">
+      <button id="vaultNameCancelBtn" style="margin-right:8px;">Cancel</button>
+      <button id="vaultNameOkBtn" disabled>Create</button>
     </div>
   </div>
+</div>
   <div id="vaultSetup" class="hidden">
     <p>Vault Location: <span id="vaultLocation"></span></p>
     <input type="password" id="password" placeholder="Enter password" />
