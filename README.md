@@ -81,12 +81,6 @@ Encryptomator is a simple, user-friendly desktop application for creating and ma
 
 ---
 
-## License
-
-This project is licensed under the ISC License.
-
----
-
 ## Disclaimer
 
 Encryptomator is provided as-is, without warranty. Always back up your data and test the application with non-critical files before using it for important information.
